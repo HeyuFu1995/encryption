@@ -17,7 +17,6 @@ const port = 3000;
 const saltRounds = 8;
 
 app.use(express.static("public"));
-app.use(bodyParser.urlencoded({ extended: true }));
 app.set('view engine', 'ejs');
 app.set('trust proxy', 1); // trust first proxy
 app.use(session({
@@ -25,6 +24,7 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
 }));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -34,6 +34,7 @@ const userSchema = new mongoose.Schema({
     email: String,
     password: String,
     googleId: String,
+    secret: String,
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -97,6 +98,14 @@ app.get('/auth/google/secrets',
         res.redirect('/secrets');
     });
 
+app.get("/submit", (req, res) => {
+    if (req.isAuthenticated()) {
+        res.render("submit");
+    } else {
+        res.redirect("/login");
+    }
+});
+
 app.post("/login", async (req, res) => {
     const email = req.body.username;
     const password = req.body.password;
@@ -133,12 +142,35 @@ app.post("/register", (req, res) => {
     });
 });
 
+app.post("/submit", (req, res) => {
+    const submittedSecret = req.body.secret;
+    User.findById(req.user.id).then(async (err, foundUser) => {
+        if(err) {
+            console.log(err);
+        } else {
+            foundUser.secret = submittedSecret;
+            await foundUser.save();
+            res.redirect("/secrets");
+            
+        }
+    });
+});
+
 app.get("/secrets", (req, res) => {
+    
     if (req.isAuthenticated()) {
-        res.render("secrets");
-    } else {
-        res.redirect("/login");
-    }
+        User.find({"secret": {$ne: null}}).then((err, foundUsers) => {
+            if(err) {
+                console.log(err);
+            } else {
+                if(foundUsers) {
+                   return res.render("secrets", {usersWithSecret: foundUsers});
+                }
+            }
+        });
+    } 
+    res.redirect("/login");
+    
 });
 
 app.get("/logout", (req, res) => {

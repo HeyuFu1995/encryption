@@ -4,6 +4,8 @@ import express from "express";
 import bodyParser from "body-parser";
 import mongoose from "mongoose";
 import encrypt from 'mongoose-encryption';
+import md5 from 'md5';
+
 dotenv.config();
 
 const app = express();
@@ -41,7 +43,7 @@ app.post("/login", async (req, res) => {
     const password = req.body.password;
 
     const u = await User.findOne({ email: email }).exec();
-    if(u && u.password === password) {
+    if(u && u.password === md5(password)) {
         return res.render("secrets");
     }
     res.render("login");
@@ -52,7 +54,7 @@ app.post("/register", (req, res) => {
     const password = req.body.password;
     const newUser = new User({
         email: email,
-        password: password,
+        password: md5(password),
     });
 
     newUser.save();

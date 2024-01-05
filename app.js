@@ -5,11 +5,13 @@ import bodyParser from "body-parser";
 import mongoose from "mongoose";
 import encrypt from 'mongoose-encryption';
 import md5 from 'md5';
+import bcrypt from 'bcrypt';
 
 dotenv.config();
 
 const app = express();
 const port = 3000;
+const saltRounds = 8;
 
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -22,7 +24,7 @@ const userSchema = new mongoose.Schema({
     password: String
 });
 
-userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
+// userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
 
 const User = new mongoose.model("User", userSchema);
 
@@ -43,8 +45,12 @@ app.post("/login", async (req, res) => {
     const password = req.body.password;
 
     const u = await User.findOne({ email: email }).exec();
-    if(u && u.password === md5(password)) {
-        return res.render("secrets");
+    if (u) {
+        bcrypt.compare(password, u.password).then((err, result) => {
+            if(result) {
+                res.render("secrets");
+            }
+        })
     }
     res.render("login");
 });
@@ -52,13 +58,14 @@ app.post("/login", async (req, res) => {
 app.post("/register", (req, res) => {
     const email = req.body.username;
     const password = req.body.password;
-    const newUser = new User({
-        email: email,
-        password: md5(password),
+    bcrypt.hash(password, saltRounds).then((err, hash) => {
+        const newUser = new User({
+            email: email,
+            password: hash,
+        });
+
+        newUser.save();
     });
-
-    newUser.save();
-
     res.render("secrets");
 });
 
